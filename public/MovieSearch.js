@@ -6,14 +6,22 @@ var peliculasGrafic = [];
 
 var datosRecibidos = null;
 
+var opcionGrafico = "valoradas";
+var soluciones = [];
+var mejores;
+var chart;
+
+
 function peticionAJAXmoderna() {
+    document.getElementById("reload").style.opacity = 1;
+    document.getElementById("reload").style.zIndex = 99;
     peticion = true;
     contenidoBusca = document.getElementById("buscador").value;
     if (contenidoBusca == '') {
         contenidoBusca = "harry";
     }
 
-    let url = "http://www.omdbapi.com/?apikey=7ab4a05e&s="+contenidoBusca+"&page="+contadorPagina+"&type="+tipoBusqueda;
+    let url = "https://www.omdbapi.com/?apikey=7ab4a05e&s="+contenidoBusca+"&page="+contadorPagina+"&type="+tipoBusqueda;
 
     fetch(url, {method : "GET" })
     .then((res) => res.json())
@@ -27,6 +35,8 @@ function peticionAJAXmoderna() {
         peticion = false;
         datosRecibidos = datos;
         añadirPelis();
+        document.getElementById("reload").style.opacity = 0;
+        document.getElementById("reload").style.zIndex = 0;
     })
    .catch((err) => console.log("error: " + err));
 }
@@ -36,6 +46,7 @@ function borrarpelis() {
     let milista = document.getElementById("peliculas");
     milista.innerHTML = "";
     contadorPagina = 1;
+    peliculasGrafic = [];
 }
 
 function añadirPelis() {
@@ -78,8 +89,9 @@ function mostrarDetalle(img, pelicula) {
 
 let element = document.getElementById("detalle");
 img.addEventListener("click", (e)=> {
+    document.body.style.overflow = "hidden";
     e.stopPropagation();
-    let url = "http://www.omdbapi.com/?apikey=7ab4a05e&t="+pelicula.Title;
+    let url = "https://www.omdbapi.com/?apikey=7ab4a05e&t="+pelicula.Title;
 
     fetch(url, {method : "GET" })
     .then((res) => res.json())
@@ -174,21 +186,134 @@ img.addEventListener("click", (e)=> {
 }
 
 
-function generarInforme(arrayPelis,opcion) {
+function generarInforme() {
+    soluciones = [];
+    peliculasGrafic.mejores = [];
+    contador = 0;
 
-    arrayPelis.forEach((pelicula)=> {
-    let url = "http://www.omdbapi.com/?apikey=7ab4a05e&t="+pelicula.Title;
+    peliculasGrafic.forEach((pelicula)=> {
+        document.getElementById("reload").style.opacity = 1;
+    document.getElementById("reload").style.zIndex = 99;
+    let url = "https://www.omdbapi.com/?apikey=7ab4a05e&i="+pelicula.imdbID;
+    peticion = true;
 
     fetch(url, {method : "GET" })
     .then((res) => res.json())
    .then((datos) => {
+    peticion = false;
+    var titulo = [];
+    switch (opcionGrafico) {
+        case "valoradas":
+            titulo = [datos.Title,parseFloat(datos.imdbRating)];
+            soluciones.push(titulo);
+          
+            break;
+        case "recaudacion":
+            if (datos.BoxOffice != "N/A") {
+            titulo = [datos.Title,parseFloat(datos.BoxOffice.split("$")[1].replace(/,/g, "."))];
+            soluciones.push(titulo);
+            }
+            break;
+        case "votadas":
+            titulo = [datos.Title,parseFloat(datos.imdbVotes.replace(/,/g, "."))];
+            soluciones.push(titulo);
+            break;
+    }
 
-    //Ver películas más valoradas por imdbRating (5), películas con mayor recaudación (5) o películas más votadas (5)
-    //switch de opcion y mostrarlos; 
 
+    soluciones = soluciones.sort((a,b) => b[1] - a[1]);
+
+    mejores = soluciones.slice(0,5);
+    
+    contador++;
+
+
+    if (contador == peliculasGrafic.length) {
+        let ol = document.getElementById("listatexto");
+        for (let mejor of mejores) {
+            let li = document.createElement("li");
+
+
+            switch (opcionGrafico) {
+                case "valoradas":
+            li.innerHTML = mejor[0]+": "+mejor[1]+"/10";
+                    
+                    break;
+                case "recaudacion":
+                    li.innerHTML = mejor[0]+": "+mejor[1]+"$";
+                    break;
+                case "votadas":
+            li.innerHTML = mejor[0]+": "+mejor[1]+" votes";
+                    
+                    break;
+                }
+
+            ol.appendChild(li);
+            
+        }
+    }
+        switch (opcionGrafico) {
+        case "valoradas":
+            pintargrafico(0);
+            break;
+        case "recaudacion":
+            pintargrafico(1);
+            break;
+        case "votadas":
+            pintargrafico(2);
+            break;
+        }
+    
+        
+
+
+        document.getElementById("reload").style.opacity = 0;
+        document.getElementById("reload").style.zIndex = 0;
    })
     .catch((err) => console.log("error: " + err));
+
 })
+
+}
+
+
+
+function pintargrafico(numero) {
+
+        var data = [];
+        data[numero] = google.visualization.arrayToDataTable([
+            ["Movie", opcionGrafico, { role: "style" } ],
+            [mejores[0][0], mejores[0][1], "green"],
+            [mejores[1][0], mejores[1][1], "blue"],
+            [mejores[2][0], mejores[2][1], "red"],
+            [mejores[3][0], mejores[3][1], "pink"],
+            [mejores[4][0], mejores[4][1], "violet"]
+          ]);
+
+          var view = new google.visualization.DataView(data[numero]);
+
+          view.setColumns([0, 1,
+            { calc: "stringify",
+              sourceColumn: 1,
+              type: "string",
+              role: "annotation" },
+            2]);
+
+
+            var options = {
+                title: "Best Movies",
+                width: "100%",
+                height: 400,
+                bar: {groupWidth: "80%"},
+                legend: { position: "none" },
+                vAxis: {title: "Movies"},
+                hAxis: {title: "Values"},
+                animation: {duration: 500, easing: 'out'}
+              };
+
+              
+              chart.draw(view, options);
+
 
 }
 
@@ -199,14 +324,9 @@ function generarInforme(arrayPelis,opcion) {
 
 
 
-
-
-
-
-
+google.charts.load('current', {'packages':['corechart']});
 window.onload = ()=> {
 
-    peticionAJAXmoderna();
     
     
     window.addEventListener("scroll", ()=> {
@@ -238,12 +358,14 @@ window.onload = ()=> {
         let cross = document.getElementsByClassName("fas fa-times")[0];
 
          if (e.target == cross) {
+        document.body.style.overflow = "";
         element.style.opacity = "0%";
         element.style.zIndex = "0";
         setTimeout(()=>{tabla.innerHTML = ""},1000);
         }else if (e.target.closest("#tabladetalle")) {
 
         }else {
+            document.body.style.overflow = "";
             element.style.opacity = "0%";
             element.style.zIndex = "0";
             setTimeout(()=>{tabla.innerHTML = ""},1000); 
@@ -271,13 +393,60 @@ window.onload = ()=> {
     document.getElementById("generar").addEventListener("click",()=> {
         let grafico = document.getElementById("grafico");
         
-        console.log(peliculasGrafic);
+        document.getElementById("graficoSeleccionado").innerHTML = "Most Rated";
+        opcionGrafico = "valoradas";
+        generarInforme();
+        chart = new google.visualization.BarChart(document.getElementById("barchart_values"));
 
 
 
+        document.body.style.overflow = "hidden";
         grafico.style.opacity = "100%";
         grafico.style.zIndex = "99";
         grafico.style.transition = "all 1s";
+    });
+
+
+    let lista = document.getElementById("listatexto");
+    document.getElementById("valoradas").addEventListener("click",()=> {
+        document.getElementById("graficoSeleccionado").innerHTML = "Most Rated";
+        lista.innerHTML = "";
+        opcionGrafico = "valoradas";
+        generarInforme();
+    });
+
+    document.getElementById("recaudacion").addEventListener("click",()=> {
+        document.getElementById("graficoSeleccionado").innerHTML = "Highest grossing";
+        lista.innerHTML = "";
+        opcionGrafico = "recaudacion";
+        generarInforme();
+    });
+
+    document.getElementById("votadas").addEventListener("click",()=> {
+        document.getElementById("graficoSeleccionado").innerHTML = "Most voted";
+        lista.innerHTML = "";
+        opcionGrafico = "votadas";
+        generarInforme();
+    });
+
+
+
+    let graf = document.getElementById("grafico");
+    graf.addEventListener("click", (e)=> {
+
+        let cross1 = document.getElementsByClassName("fas fa-times")[0];
+
+         if (e.target == cross1) {
+        document.body.style.overflow = "";
+        graf.style.opacity = "0%";
+        graf.style.zIndex = "0";
+        }else if (e.target.closest("#graficocontent")) {
+
+        }else {
+            document.body.style.overflow = "";
+            graf.style.opacity = "0%";
+            graf.style.zIndex = "0";
+        }
     });
 
 }
