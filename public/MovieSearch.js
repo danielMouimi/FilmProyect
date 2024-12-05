@@ -346,6 +346,7 @@ window.onload = ()=> {
     document.getElementById("buscador").addEventListener("input", (e)=> {
         if (e.target.value.length >= 3) {
             tipoBusqueda = null;
+            peliculasGrafic = [];
             borrarpelis();
             peticionAJAXmoderna();
         }
